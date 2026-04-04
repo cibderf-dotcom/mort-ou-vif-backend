@@ -96,24 +96,9 @@ app.post("/api/reset-demo", (req, res) => {
   ];
 
   scores.length = 0;
-scores.push(...demoScores);
+  scores.push(...demoScores);
 
-  res.json({ success: true });
-});
-
-// Reviews
-app.post('/api/review', (req, res) => {
-  const { pseudo, message } = req.body;
-
-  if (!pseudo || !message || message.length > 300) {
-    return res.status(400).json({ error: 'Invalid data' });
-  }
-
-  const stmt = db.prepare("INSERT INTO reviews (pseudo, message) VALUES (?, ?)");
-  stmt.run(pseudo.substring(0, 20), message.substring(0, 300));
-  stmt.finalize();
-
-  res.json({ success: true });
+  res.json({ success: true, count: scores.length });
 });
 
 app.get('/api/reviews', (req, res) => {
