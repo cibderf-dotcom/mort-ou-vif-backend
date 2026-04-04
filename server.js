@@ -34,18 +34,43 @@ db.serialize(() => {
   )`);
 });
 
+db.run(`CREATE TABLE IF NOT EXISTS scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pseudo TEXT,
+  score INTEGER,
+  cartes INTEGER,
+  stars INTEGER,
+  comment TEXT,
+  date DATETIME DEFAULT CURRENT_TIMESTAMP
+)`);
+
+db.run("ALTER TABLE scores ADD COLUMN cartes INTEGER");
+db.run("ALTER TABLE scores ADD COLUMN stars INTEGER");
+db.run("ALTER TABLE scores ADD COLUMN comment TEXT");
+
 // Routes
 
 // Score
 app.post('/api/score', (req, res) => {
-  const { pseudo, score } = req.body;
+  const { pseudo, score, cartes, stars, comment } = req.body;
 
   if (!pseudo || typeof score !== 'number' || score < 0) {
     return res.status(400).json({ error: 'Invalid data' });
   }
 
-  const stmt = db.prepare("INSERT INTO scores (pseudo, score) VALUES (?, ?)");
-  stmt.run(pseudo.substring(0, 20), score);
+  const stmt = db.prepare(`
+    INSERT INTO scores (pseudo, score, cartes, stars, comment)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  stmt.run(
+    pseudo.substring(0, 20),
+    score,
+    cartes || 0,
+    stars || 0,
+    comment || ""
+  );
+
   stmt.finalize();
 
   res.json({ success: true });
