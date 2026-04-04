@@ -66,6 +66,40 @@ app.get('/api/visit', (req, res) => {
   });
 });
 
+app.post("/api/reset-demo", (req, res) => {
+
+  const demoScores = [
+    {
+      pseudo: "Lucky Luke",
+      score: 120,
+      cartes: 10,
+      stars: 3,
+      date: "2024-01-15",
+      comment: "L’homme qui tire plus vite que son ombre"
+    },
+    {
+      pseudo: "Billy the Kid",
+      score: 95,
+      cartes: 9,
+      stars: 2,
+      date: "2024-02-02",
+      comment: "Hors-la-loi légendaire du Far West"
+    },
+    {
+      pseudo: "Calamity Jane",
+      score: 80,
+      cartes: 8,
+      stars: 2,
+      date: "2024-03-10",
+      comment: "Aventurière emblématique"
+    }
+  ];
+
+  scores = demoScores;
+
+  res.json({ success: true });
+});
+
 // Reviews
 app.post('/api/review', (req, res) => {
   const { pseudo, message } = req.body;
