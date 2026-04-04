@@ -15,7 +15,9 @@ const db = new sqlite3.Database('./db.sqlite');
 // =========================
 
 db.serialize(function () {
-
+db.run("ALTER TABLE scores ADD COLUMN cartes INTEGER DEFAULT 0", function(){});
+db.run("ALTER TABLE scores ADD COLUMN stars INTEGER DEFAULT 0", function(){});
+db.run("ALTER TABLE scores ADD COLUMN comment TEXT DEFAULT ''", function(){});
   db.run(
     "CREATE TABLE IF NOT EXISTS scores (" +
     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
