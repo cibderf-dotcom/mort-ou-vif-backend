@@ -1,4 +1,68 @@
 const express = require('express');
+
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pseudo TEXT,
+    score INTEGER,
+    cartes INTEGER,
+    stars INTEGER,
+    comment TEXT,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS visits (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    count INTEGER
+  )`);
+
+  db.run(`INSERT OR IGNORE INTO visits (id, count) VALUES (1, 0)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pseudo TEXT,
+    message TEXT,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Ajout colonnes si besoin (safe)
+  db.run("ALTER TABLE scores ADD COLUMN cartes INTEGER", ()=>{});
+  db.run("ALTER TABLE scores ADD COLUMN stars INTEGER", ()=>{});
+  db.run("ALTER TABLE scores ADD COLUMN comment TEXT", ()=>{});
+});
+
+// =========================
+// ROUTES
+// =========================
+
+// Ajouter score
+app.post('/api/score', (req, res) => {
+  const { pseudo, score, cartes, stars, comment } = req.body;
+
+  if (!pseudo || typeof score !== 'number' || score < 0) {
+    return res.status(400).json({ error: 'Invalid data' });
+  }
+
+  const stmt = db.prepare(`
+    INSERT INTO scores (pseudo, score, cartes, stars, comment)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  stmt.run(
+    pseudo.substring(0, 20),
+    score,
+    cartes || 0,
+    stars || 0,
+    comment || ""
+  );
+
+  stmt.finalize();
+
+  res.json({ success: true });
+});
+
+// Récupérer scores
+app.get('/api/scores', (req, res) => {
   db.all(`
     SELECT pseudo, score, cartes, stars, comment, date
     FROM scores
@@ -10,7 +74,7 @@ const express = require('express');
   });
 });
 
-// Reset demo scores
+// Reset avec scores de démo
 app.post('/api/reset-demo', (req, res) => {
 
   const demoScores = [
@@ -34,60 +98,4 @@ app.post('/api/reset-demo', (req, res) => {
       pseudo: "Calamity Jane",
       score: 80,
       cartes: 8,
-      stars: 2,
-      comment: "Aventurière emblématique",
-      date: "2024-03-10"
-    }
-  ];
-
-  db.serialize(() => {
-
-    db.run("DELETE FROM scores", function(err){
-      if (err) return res.status(500).json({ error: err.message });
-
-      const stmt = db.prepare(`
-        INSERT INTO scores (pseudo, score, cartes, stars, comment, date)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
-
-      demoScores.forEach(s => {
-        stmt.run(
-          s.pseudo,
-          s.score,
-          s.cartes,
-          s.stars,
-          s.comment,
-          s.date
-        );
-      });
-
-      stmt.finalize((err) => {
-        if (err) return res.status(500).json({ error: err.message });
-
-        res.json({ success: true, count: demoScores.length });
-      });
-    });
-
-  });
-
-});
-
-// Visits
-app.get('/api/visit', (req, res) => {
-  db.run("UPDATE visits SET count = count + 1 WHERE id = 1", () => {
-    db.get("SELECT count FROM visits WHERE id = 1", (err, row) => {
-      res.json({ count: row.count });
-    });
-  });
-});
-
-// Reviews
-app.get('/api/reviews', (req, res) => {
-  db.all("SELECT pseudo, message, date FROM reviews ORDER BY date DESC LIMIT 50", [], (err, rows) => {
-    res.json(rows);
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });
