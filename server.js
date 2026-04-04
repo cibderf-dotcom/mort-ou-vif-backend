@@ -1,10 +1,29 @@
 const express = require('express');
+  db.run(`CREATE TABLE IF NOT EXISTS visits (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    count INTEGER
+  )`);
+
+  db.run(`INSERT OR IGNORE INTO visits (id, count) VALUES (1, 0)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pseudo TEXT,
+    message TEXT,
+    date DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+});
+
+// ROUTES
+
+app.post('/api/score', (req, res) => {
+  const { pseudo, score, cartes, stars, comment } = req.body;
+
+  if (!pseudo || typeof score !== 'number' || score < 0) {
+    return res.status(400).json({ error: 'Invalid data' });
   }
 
-  const stmt = db.prepare(`
-    INSERT INTO scores (pseudo, score, cartes, stars, comment)
-    VALUES (?, ?, ?, ?, ?)
-  `);
+  const stmt = db.prepare("INSERT INTO scores (pseudo, score, cartes, stars, comment) VALUES (?, ?, ?, ?, ?)");
 
   stmt.run(
     pseudo.substring(0, 20),
@@ -19,20 +38,13 @@ const express = require('express');
   res.json({ success: true });
 });
 
-// Récupérer scores
 app.get('/api/scores', (req, res) => {
-  db.all(`
-    SELECT pseudo, score, cartes, stars, comment, date
-    FROM scores
-    ORDER BY score DESC
-    LIMIT 50
-  `, [], (err, rows) => {
+  db.all("SELECT pseudo, score, cartes, stars, comment, date FROM scores ORDER BY score DESC LIMIT 50", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
 });
 
-// Reset démo
 app.post('/api/reset-demo', (req, res) => {
 
   const demoScores = [
@@ -46,10 +58,7 @@ app.post('/api/reset-demo', (req, res) => {
     db.run("DELETE FROM scores", (err) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      const stmt = db.prepare(`
-        INSERT INTO scores (pseudo, score, cartes, stars, comment, date)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
+      const stmt = db.prepare("INSERT INTO scores (pseudo, score, cartes, stars, comment, date) VALUES (?, ?, ?, ?, ?, ?)");
 
       demoScores.forEach(row => {
         stmt.run(row);
@@ -57,16 +66,14 @@ app.post('/api/reset-demo', (req, res) => {
 
       stmt.finalize((err) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, count: demoScores.length });
+        res.json({ success: true });
       });
 
     });
 
   });
-
 });
 
-// Compteur visites
 app.get('/api/visit', (req, res) => {
   db.run("UPDATE visits SET count = count + 1 WHERE id = 1", () => {
     db.get("SELECT count FROM visits WHERE id = 1", (err, row) => {
@@ -75,16 +82,11 @@ app.get('/api/visit', (req, res) => {
   });
 });
 
-// Avis
 app.get('/api/reviews', (req, res) => {
   db.all("SELECT pseudo, message, date FROM reviews ORDER BY date DESC LIMIT 50", [], (err, rows) => {
     res.json(rows);
   });
 });
-
-// =========================
-// START SERVER (RENDER SAFE)
-// =========================
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log("Server running on port " + PORT);
