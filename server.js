@@ -1,4 +1,30 @@
 const express = require('express');
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: err.message });
+    }
+
+    res.json(rows);
+  });
+});
+
+// Reset demo (CORRIGÉ)
+app.post('/api/reset-demo', (req, res) => {
+
+  const demoScores = [
+    ["Lucky Luke", 120, 10, 3, "L’homme qui tire plus vite que son ombre", "2024-01-15"],
+    ["Billy the Kid", 95, 9, 2, "Hors-la-loi légendaire du Far West", "2024-02-02"],
+    ["Calamity Jane", 80, 8, 2, "Aventurière emblématique", "2024-03-10"]
+  ];
+
+  db.serialize(() => {
+
+    db.run("DELETE FROM scores", (err) => {
+
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: err.message });
+      }
 
       const stmt = db.prepare(`
         INSERT INTO scores (pseudo, score, cartes, stars, comment, date)
