@@ -95,7 +95,8 @@ app.post("/api/reset-demo", (req, res) => {
     }
   ];
 
-  scores = demoScores;
+  scores.length = 0;
+scores.push(...demoScores);
 
   res.json({ success: true });
 });
