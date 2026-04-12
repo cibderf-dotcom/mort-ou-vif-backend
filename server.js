@@ -8,120 +8,170 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+const ENV = (process.env.APP_ENV || process.env.NODE_ENV || "UNKNOWN").toUpperCase();
+
+const BACKEND_PROD = process.env.BACKEND_PROD;
+const BACKEND_PREPROD = process.env.BACKEND_PREPROD;
+
 const db = new sqlite3.Database('./db.sqlite');
 
-// =========================
-// INIT DB
-// =========================
-
 db.serialize(function () {
-db.run("ALTER TABLE scores ADD COLUMN cartes INTEGER DEFAULT 0", function(){});
-db.run("ALTER TABLE scores ADD COLUMN stars INTEGER DEFAULT 0", function(){});
-db.run("ALTER TABLE scores ADD COLUMN comment TEXT DEFAULT ''", function(){});
-  db.run(
-    "CREATE TABLE IF NOT EXISTS scores (" +
-    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-    "pseudo TEXT," +
-    "score INTEGER," +
-    "cartes INTEGER DEFAULT 0," +
-    "stars INTEGER DEFAULT 0," +
-    "comment TEXT DEFAULT ''," +
-    "date DATETIME DEFAULT CURRENT_TIMESTAMP" +
-    ")"
-  );
 
-  db.run(
-    "CREATE TABLE IF NOT EXISTS visits (" +
-    "id INTEGER PRIMARY KEY CHECK (id = 1)," +
-    "count INTEGER" +
-    ")"
-  );
+  db.run(`CREATE TABLE IF NOT EXISTS scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pseudo TEXT,
+    score INTEGER,
+    cartes INTEGER DEFAULT 0,
+    stars INTEGER DEFAULT 0,
+    comment TEXT DEFAULT '',
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mode TEXT DEFAULT 'chrono'
+  )`);
 
-  db.run("INSERT OR IGNORE INTO visits (id, count) VALUES (1, 0)");
+  db.run(`CREATE TABLE IF NOT EXISTS maintenance (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    start INTEGER,
+    duration INTEGER,
+    lastPing INTEGER,
+    ended INTEGER DEFAULT 1
+  )`);
 
-  db.run(
-    "CREATE TABLE IF NOT EXISTS reviews (" +
-    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-    "pseudo TEXT," +
-    "message TEXT," +
-    "date DATETIME DEFAULT CURRENT_TIMESTAMP" +
-    ")"
-  );
-
+  db.run(`INSERT OR IGNORE INTO maintenance (id, ended) VALUES (1, 1)`);
 });
 
 // =========================
-// ROUTES
+// ROUTES SCORES
 // =========================
 
-// Health check
-app.get('/', function (req, res) {
-  res.send('OK');
+// GET
+app.get('/api/scores', (req,res)=>{
+  db.all("SELECT * FROM scores ORDER BY score DESC LIMIT 50", [], (err, rows)=>{
+    if(err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
 });
 
-// Add score
-app.post('/api/score', function (req, res) {
+// POST
+app.post('/api/scores', (req,res)=>{
 
-  var pseudo = req.body.pseudo;
-  var score = req.body.score;
-  var cartes = req.body.cartes || 0;
-  var stars = req.body.stars || 0;
-  var comment = req.body.comment || "";
+  const s = req.body;
 
-  if (!pseudo || typeof score !== 'number' || score < 0) {
-    return res.status(400).json({ error: 'Invalid data' });
+  console.log("[POST SCORE]", s);
+
+  if(!s || !s.pseudo || s.score === undefined){
+    console.warn("[POST SCORE] invalid payload");
+    return res.status(400).json({error:"invalid"});
   }
 
-  var stmt = db.prepare(
-    "INSERT INTO scores (pseudo, score, cartes, stars, comment) VALUES (?, ?, ?, ?, ?)"
-  );
+  db.run(
+    "INSERT INTO scores (pseudo, score, cartes, stars, date, mode) VALUES (?,?,?,?,?,?)",
+    [
+      s.pseudo,
+      s.score,
+      s.cartes || 0,
+      s.stars || 0,
+      s.date || new Date().toISOString(),
+      s.mode || "chrono"
+    ],
+    function(err){
+      if(err){
+        console.error("[POST SCORE] DB error", err);
+        return res.status(500).json({error:err.message});
+      }
 
-  stmt.run(pseudo.substring(0, 20), score, cartes, stars, comment);
-  stmt.finalize();
+      console.log("[POST SCORE] inserted id=", this.lastID);
 
-  res.json({ success: true });
-});
+      try{
 
-// Get scores
-app.get('/api/scores', function (req, res) {
+        const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-  db.all(
-    "SELECT pseudo, score, cartes, stars, comment, date FROM scores ORDER BY score DESC LIMIT 50",
-    [],
-    function (err, rows) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json(rows);
+        const msg =
+`Nouveau score [${ENV}]
+${s.date || new Date().toISOString()}
+${s.pseudo}
+Score: ${s.score}
+Cartes: ${s.cartes || 0}
+Étoiles: ${s.stars || 0}
+Mode: ${s.mode || "chrono"}`;
+
+        console.log("[TELEGRAM] sending score", msg);
+
+        sendTelegramRaw(CHAT_ID, msg);
+
+      }catch(e){
+        console.error("[TELEGRAM] error", e);
+      }
+
+      res.json({ok:true, id:this.lastID});
     }
   );
 
 });
 
-// Reset demo (CORRIGÉ)
-app.post('/api/reset-demo', function (req, res) {
+// COUNT HOF
+app.get('/api/hof/count', (req,res)=>{
+  db.get("SELECT COUNT(DISTINCT pseudo) as count FROM scores", [], (err,row)=>{
+    if(err) return res.status(500).json({ error: err.message });
+    res.json({ count: row.count || 0 });
+  });
+});
 
-  var demoScores = [
-    ["Lucky Luke", 120, 10, 3, "L’homme qui tire plus vite que son ombre", "2024-01-15"],
-    ["Billy the Kid", 95, 9, 2, "Hors-la-loi légendaire du Far West", "2024-02-02"],
-    ["Calamity Jane", 80, 8, 2, "Aventurière emblématique", "2024-03-10"]
-  ];
+// =========================
+// 🔥 RAZ (FIX FINAL)
+// =========================
 
-  db.serialize(function () {
+app.post('/api/raz', (req, res)=>{
 
-    db.run("DELETE FROM scores", function (err) {
+  console.log("[RAZ] request");
 
-      if (err) return res.status(500).json({ error: err.message });
+  db.serialize(()=>{
 
-      var stmt = db.prepare(
-        "INSERT INTO scores (pseudo, score, cartes, stars, comment, date) VALUES (?, ?, ?, ?, ?, ?)"
-      );
+    db.run("DELETE FROM scores", function(err){
 
-      demoScores.forEach(function (row) {
-        stmt.run(row[0], row[1], row[2], row[3], row[4], row[5]);
-      });
+      if(err){
+        console.error("[RAZ] delete error", err);
+        return res.status(500).send("error");
+      }
 
-      stmt.finalize(function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, count: demoScores.length });
+      console.log("[RAZ] table cleared, deleted =", this.changes);
+
+      const demo = [
+        ["Doc Holliday", 92, 40, 0, "zen"],
+        ["Calamity Jane", 88, 35, 0, "chrono"],
+        ["Matt", 91, 52, 0, "zen"],
+        ["Lucky Luke", 85, 30, 0, "chrono"]
+      ];
+
+      let inserted = 0;
+
+      demo.forEach(d => {
+
+        db.run(
+          "INSERT INTO scores (pseudo, score, cartes, stars, mode) VALUES (?,?,?,?,?)",
+          d,
+          function(err){
+
+            if(err){
+              console.error("[RAZ] insert error", err);
+              return;
+            }
+
+            inserted++;
+
+            console.log("[RAZ] inserted id=", this.lastID);
+
+            if(inserted === demo.length){
+
+              db.get("SELECT COUNT(*) as count FROM scores", [], (e,row)=>{
+                console.log("[RAZ] final count =", row?.count);
+                res.send("OK");
+              });
+
+            }
+
+          }
+        );
+
       });
 
     });
@@ -130,31 +180,101 @@ app.post('/api/reset-demo', function (req, res) {
 
 });
 
-// Visits
-app.get('/api/visit', function (req, res) {
+// =========================
+// MAINTENANCE
+// =========================
 
-  db.run("UPDATE visits SET count = count + 1 WHERE id = 1", function () {
-    db.get("SELECT count FROM visits WHERE id = 1", function (err, row) {
-      res.json({ count: row.count });
+app.get('/api/maintenance-status', (req,res)=>{
+
+  db.get("SELECT * FROM maintenance WHERE id=1", [], (err,row)=>{
+
+    if(err) return res.status(500).json({ error: err.message });
+
+    if(!row || !row.start || row.ended){
+      return res.json({ active:false });
+    }
+
+    const now = Date.now();
+    const remaining = row.duration - (now - row.start);
+
+    if(remaining <= 0 && !row.ended){
+
+      db.run("UPDATE maintenance SET ended=1 WHERE id=1");
+
+      sendMaintenanceEndChoices();
+
+      return res.json({ active:false });
+    }
+
+    res.json({
+      active:true,
+      start:row.start,
+      duration:row.duration,
+      remaining: remaining > 0 ? remaining : 0
     });
+
   });
 
 });
 
-// Reviews
-app.get('/api/reviews', function (req, res) {
+// =========================
+// TELEGRAM HELPERS
+// =========================
 
-  db.all(
-    "SELECT pseudo, message, date FROM reviews ORDER BY date DESC LIMIT 50",
-    [],
-    function (err, rows) {
-      res.json(rows);
-    }
+async function sendTelegramRaw(chatId, message){
+
+  const TOKEN = process.env.TELEGRAM_TOKEN;
+  if(!TOKEN) return;
+
+  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ chat_id:chatId, text:message })
+  });
+}
+
+async function sendTelegramWithKeyboard(chatId, text, keyboard){
+
+  const TOKEN = process.env.TELEGRAM_TOKEN;
+
+  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      chat_id:chatId,
+      text,
+      reply_markup:{ inline_keyboard:keyboard }
+    })
+  });
+}
+
+async function sendMaintenanceEndChoices(){
+
+  const TOKEN = process.env.TELEGRAM_TOKEN;
+  const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({
+      chat_id: CHAT_ID,
+      text: `[${ENV}] Maintenance terminée. Action ?`,
+      reply_markup:{
+        inline_keyboard:[
+          [
+            { text:"🔁 Relancer la maintenance", callback_data:"restart_"+ENV },
+            { text:"🌐 Réactiver le site", callback_data:"resume_"+ENV }
+          ]
+        ]
+      }
+    })
   );
+}
 
-});
+// =========================
+// SERVER
+// =========================
 
-// START
-app.listen(PORT, '0.0.0.0', function () {
-  console.log('Server running on port ' + PORT);
+app.listen(PORT, '0.0.0.0', ()=>{
+  console.log("Server running on port", PORT);
 });
