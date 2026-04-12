@@ -43,7 +43,6 @@ db.serialize(function () {
 // ROUTES SCORES
 // =========================
 
-// GET
 app.get('/api/scores', (req,res)=>{
   db.all("SELECT * FROM scores ORDER BY score DESC LIMIT 50", [], (err, rows)=>{
     if(err) return res.status(500).json({ error: err.message });
@@ -51,7 +50,6 @@ app.get('/api/scores', (req,res)=>{
   });
 });
 
-// POST
 app.post('/api/scores', (req,res)=>{
 
   const s = req.body;
@@ -108,7 +106,6 @@ Mode: ${s.mode || "chrono"}`;
 
 });
 
-// COUNT HOF
 app.get('/api/hof/count', (req,res)=>{
   db.get("SELECT COUNT(DISTINCT pseudo) as count FROM scores", [], (err,row)=>{
     if(err) return res.status(500).json({ error: err.message });
@@ -117,62 +114,65 @@ app.get('/api/hof/count', (req,res)=>{
 });
 
 // =========================
-// 🔥 RAZ (FIX FINAL)
+// 🔥 RAZ (corrigé syntaxe + stable)
 // =========================
 
 app.post('/api/raz', (req, res)=>{
 
   console.log("[RAZ] request");
 
-  db.serialize(()=>{
+  db.run("DELETE FROM scores", function(err){
 
-    db.run("DELETE FROM scores", function(err){
+    if(err){
+      console.error("[RAZ] delete error", err);
+      return res.status(500).send("error");
+    }
 
-      if(err){
-        console.error("[RAZ] delete error", err);
-        return res.status(500).send("error");
-      }
+    console.log("[RAZ] table cleared, deleted =", this.changes);
 
-      console.log("[RAZ] table cleared, deleted =", this.changes);
+    const demo = [
+      ["Doc Holliday", 92, 40, 0, "zen"],
+      ["Calamity Jane", 88, 35, 0, "chrono"],
+      ["Matt", 91, 52, 0, "zen"],
+      ["Lucky Luke", 85, 30, 0, "chrono"]
+    ];
 
-      const demo = [
-        ["Doc Holliday", 92, 40, 0, "zen"],
-        ["Calamity Jane", 88, 35, 0, "chrono"],
-        ["Matt", 91, 52, 0, "zen"],
-        ["Lucky Luke", 85, 30, 0, "chrono"]
-      ];
+    let inserted = 0;
 
-      let inserted = 0;
+    demo.forEach((d) => {
 
-      demo.forEach(d => {
+      db.run(
+        "INSERT INTO scores (pseudo, score, cartes, stars, mode) VALUES (?,?,?,?,?)",
+        d,
+        function(err){
 
-        db.run(
-          "INSERT INTO scores (pseudo, score, cartes, stars, mode) VALUES (?,?,?,?,?)",
-          d,
-          function(err){
+          if(err){
+            console.error("[RAZ] insert error", err);
+            return;
+          }
 
-            if(err){
-              console.error("[RAZ] insert error", err);
-              return;
-            }
+          inserted++;
 
-            inserted++;
+          console.log("[RAZ] inserted id=", this.lastID);
 
-            console.log("[RAZ] inserted id=", this.lastID);
+          if(inserted === demo.length){
 
-            if(inserted === demo.length){
+            db.get("SELECT COUNT(*) as count FROM scores", [], function(e,row){
 
-              db.get("SELECT COUNT(*) as count FROM scores", [], (e,row)=>{
-                console.log("[RAZ] final count =", row?.count);
-                res.send("OK");
-              });
+              if(e){
+                console.error("[RAZ] count error", e);
+                return res.status(500).send("error");
+              }
 
-            }
+              console.log("[RAZ] final count =", row.count);
+
+              return res.send("OK");
+            });
 
           }
-        );
 
-      });
+        }
+      );
 
     });
 
