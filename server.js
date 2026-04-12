@@ -114,7 +114,7 @@ app.get('/api/hof/count', (req,res)=>{
 });
 
 // =========================
-// 🔥 RAZ (corrigé syntaxe + stable)
+// 🔥 RAZ
 // =========================
 
 app.post('/api/raz', (req, res)=>{
@@ -268,7 +268,7 @@ async function sendMaintenanceEndChoices(){
         ]
       }
     })
-  );
+  });
 }
 
 // =========================
