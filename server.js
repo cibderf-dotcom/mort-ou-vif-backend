@@ -227,7 +227,7 @@ async function sendTelegramRaw(chatId, message){
     NODE_ENV: process.env.NODE_ENV,
     ENV
   });
-  console.log("[TELEGRAM][FINAL TAG]", tag);
+console.log("[TELEGRAM][FINAL TAG]", `[${ENV}]`);
   const TOKEN = process.env.TELEGRAM_TOKEN;
   if(!TOKEN) return;
 
