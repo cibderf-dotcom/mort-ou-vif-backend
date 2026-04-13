@@ -14,6 +14,13 @@ const ENV = (process.env.APP_ENV || process.env.NODE_ENV || "UNKNOWN").toUpperCa
 const BACKEND_PROD = process.env.BACKEND_PROD;
 const BACKEND_PREPROD = process.env.BACKEND_PREPROD;
 
+// =========================
+// TIME PARIS (AJOUT)
+// =========================
+function nowParis(){
+  return new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Paris' }).replace(' ', 'T');
+}
+
 const db = new sqlite3.Database('/var/data/db.sqlite');
 
 db.serialize(function () {
@@ -113,7 +120,7 @@ app.post('/api/scores', (req,res)=>{
           s.score,
           s.cartes || 0,
           s.stars || 0,
-          s.date || new Date().toISOString(),
+          s.date || nowParis(), // ✅ FIX
           s.mode || "chrono",
           signature
         ],
@@ -130,7 +137,7 @@ app.post('/api/scores', (req,res)=>{
 
             const msg =
 `Nouveau score [${ENV}]
-${s.date || new Date().toISOString()}
+${new Date(s.date || Date.now()).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })} 
 ${s.pseudo}
 Score: ${s.score}
 Cartes: ${s.cartes || 0}
@@ -217,7 +224,7 @@ app.post('/api/raz', (req, res)=>{
       ["Doc Holliday", 92, 40, 2, "zen", "Rapide comme l'éclair"],
       ["Calamity Jane", 88, 35, 2, "chrono", "Toujours solide"],
       ["Matt", 91, 52, 3, "zen", "Merci pour les tests"],
-      ["Matt", 99, 117, 5, "zen", "Shériff de la ville"],
+      ["Matt", 99, 117, 5, "zen", "Shériff de la ville (mais a testé la triche)"],
       ["Vivi", 89, 22, 1, "chrono", "Belle remontée"]
     ];
 
