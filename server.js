@@ -217,7 +217,7 @@ app.post('/api/raz', (req, res)=>{
       ["Doc Holliday", 92, 40, 0, "zen"],
       ["Calamity Jane", 88, 35, 0, "chrono"],
       ["Matt", 91, 52, 0, "zen"],
-      ["Lucky Luke", 85, 30, 0, "chrono"]
+      ["Vivi", 89, 22, 1, "chrono"]
     ];
 
     let inserted = 0;
