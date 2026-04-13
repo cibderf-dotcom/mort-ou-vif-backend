@@ -1,7 +1,7 @@
 const express = require('express');
-const path = require('path');
-const db = new sqlite3.Database(path.resolve(__dirname, 'db.sqlite'));
+const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,7 +14,7 @@ const ENV = (process.env.APP_ENV || process.env.NODE_ENV || "UNKNOWN").toUpperCa
 const BACKEND_PROD = process.env.BACKEND_PROD;
 const BACKEND_PREPROD = process.env.BACKEND_PREPROD;
 
-const db = new sqlite3.Database('./db.sqlite');
+const db = new sqlite3.Database(path.resolve(__dirname, 'db.sqlite'));
 
 db.serialize(function () {
 
@@ -26,8 +26,12 @@ db.serialize(function () {
     stars INTEGER DEFAULT 0,
     comment TEXT DEFAULT '',
     date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    mode TEXT DEFAULT 'chrono'
+    mode TEXT DEFAULT 'chrono',
+    deleted INTEGER DEFAULT 0,
+    signature TEXT
   )`);
+
+  db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_signature ON scores(signature)`);
 
   db.run(`CREATE TABLE IF NOT EXISTS maintenance (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -45,7 +49,7 @@ db.serialize(function () {
 // =========================
 
 app.get('/api/scores', (req,res)=>{
-  db.all("SELECT * FROM scores ORDER BY score DESC LIMIT 50", [], (err, rows)=>{
+  db.all("SELECT * FROM scores WHERE deleted = 0 ORDER BY score DESC LIMIT 50", [], (err, rows)=>{
     if(err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
@@ -62,29 +66,69 @@ app.post('/api/scores', (req,res)=>{
     return res.status(400).json({error:"invalid"});
   }
 
-  db.run(
-    "INSERT INTO scores (pseudo, score, cartes, stars, date, mode) VALUES (?,?,?,?,?,?)",
-    [
-      s.pseudo,
-      s.score,
-      s.cartes || 0,
-      s.stars || 0,
-      s.date || new Date().toISOString(),
-      s.mode || "chrono"
-    ],
-    function(err){
+  const signature = [
+    s.pseudo,
+    s.score,
+    s.cartes || 0,
+    s.stars || 0,
+    s.mode || "chrono"
+  ].join("|");
+
+  db.get(
+    "SELECT id, deleted FROM scores WHERE signature = ?",
+    [signature],
+    (err, row) => {
+
       if(err){
-        console.error("[POST SCORE] DB error", err);
+        console.error("[POST SCORE] select error", err);
         return res.status(500).json({error:err.message});
       }
 
-      console.log("[POST SCORE] inserted id=", this.lastID);
+      if(row){
+        if(row.deleted){
 
-      try{
+          console.log("[POST SCORE] restoring id=", row.id);
 
-        const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+          db.run(
+            "UPDATE scores SET deleted = 0 WHERE id = ?",
+            [row.id],
+            function(e){
+              if(e) return res.status(500).json({error:e.message});
+              return res.json({ok:true, restored:true});
+            }
+          );
 
-        const msg =
+        } else {
+          console.log("[POST SCORE] duplicate ignored id=", row.id);
+          return res.json({ok:true, duplicate:true});
+        }
+
+        return;
+      }
+
+      db.run(
+        "INSERT INTO scores (pseudo, score, cartes, stars, date, mode, signature) VALUES (?,?,?,?,?,?,?)",
+        [
+          s.pseudo,
+          s.score,
+          s.cartes || 0,
+          s.stars || 0,
+          s.date || new Date().toISOString(),
+          s.mode || "chrono",
+          signature
+        ],
+        function(err){
+          if(err){
+            console.error("[POST SCORE] insert error", err);
+            return res.status(500).json({error:err.message});
+          }
+
+          console.log("[POST SCORE] inserted id=", this.lastID);
+
+          try{
+            const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+            const msg =
 `Nouveau score [${ENV}]
 ${s.date || new Date().toISOString()}
 ${s.pseudo}
@@ -93,31 +137,67 @@ Cartes: ${s.cartes || 0}
 Étoiles: ${s.stars || 0}
 Mode: ${s.mode || "chrono"}`;
 
-        console.log("[TELEGRAM] sending score", msg);
+            sendTelegramRaw(CHAT_ID, msg).catch(e=>{
+              console.error("[TELEGRAM] async error", e);
+            });
 
-       sendTelegramRaw(CHAT_ID, msg).catch(e => {
-  console.error("[TELEGRAM] async error", e);
-});
+          }catch(e){
+            console.error("[TELEGRAM] error", e);
+          }
 
-      }catch(e){
-        console.error("[TELEGRAM] error", e);
-      }
+          res.json({ok:true, id:this.lastID});
+        }
+      );
 
-      res.json({ok:true, id:this.lastID});
     }
   );
 
 });
 
+// =========================
+// DELETE (soft)
+// =========================
+
+app.delete('/api/score/:id', (req, res) => {
+
+  const id = req.params.id;
+
+  console.log("[DELETE SCORE] id =", id);
+
+  db.run("UPDATE scores SET deleted = 1 WHERE id = ?", [id], function(err){
+
+    if(err){
+      console.error("[DELETE SCORE] error", err);
+      return res.status(500).json({ error: err.message });
+    }
+
+    console.log("[DELETE SCORE] soft deleted =", this.changes);
+
+    res.json({ ok:true, deleted:this.changes });
+  });
+
+});
+
+// =========================
+// RESTORE (optionnel)
+// =========================
+
+app.post('/api/score/:id/restore', (req,res)=>{
+  db.run("UPDATE scores SET deleted = 0 WHERE id = ?", [req.params.id], function(err){
+    if(err) return res.status(500).json({ error: err.message });
+    res.json({ ok:true });
+  });
+});
+
 app.get('/api/hof/count', (req,res)=>{
-  db.get("SELECT COUNT(DISTINCT pseudo) as count FROM scores", [], (err,row)=>{
+  db.get("SELECT COUNT(DISTINCT pseudo) as count FROM scores WHERE deleted = 0", [], (err,row)=>{
     if(err) return res.status(500).json({ error: err.message });
     res.json({ count: row.count || 0 });
   });
 });
 
 // =========================
-// 🔥 RAZ
+// RAZ
 // =========================
 
 app.post('/api/raz', (req, res)=>{
@@ -137,16 +217,24 @@ app.post('/api/raz', (req, res)=>{
       ["Doc Holliday", 92, 40, 0, "zen"],
       ["Calamity Jane", 88, 35, 0, "chrono"],
       ["Matt", 91, 52, 0, "zen"],
-      ["Vivi", 89, 22, 1, "chrono"]
+      ["Lucky Luke", 85, 30, 0, "chrono"]
     ];
 
     let inserted = 0;
 
     demo.forEach((d) => {
 
+      const signature = [
+        d[0],
+        d[1],
+        d[2],
+        d[3],
+        d[4]
+      ].join("|");
+
       db.run(
-        "INSERT INTO scores (pseudo, score, cartes, stars, mode) VALUES (?,?,?,?,?)",
-        d,
+        "INSERT INTO scores (pseudo, score, cartes, stars, mode, signature) VALUES (?,?,?,?,?,?)",
+        [...d, signature],
         function(err){
 
           if(err){
@@ -184,44 +272,7 @@ app.post('/api/raz', (req, res)=>{
 });
 
 // =========================
-// MAINTENANCE
-// =========================
-
-app.get('/api/maintenance-status', (req,res)=>{
-
-  db.get("SELECT * FROM maintenance WHERE id=1", [], (err,row)=>{
-
-    if(err) return res.status(500).json({ error: err.message });
-
-    if(!row || !row.start || row.ended){
-      return res.json({ active:false });
-    }
-
-    const now = Date.now();
-    const remaining = row.duration - (now - row.start);
-
-    if(remaining <= 0 && !row.ended){
-
-      db.run("UPDATE maintenance SET ended=1 WHERE id=1");
-
-      sendMaintenanceEndChoices();
-
-      return res.json({ active:false });
-    }
-
-    res.json({
-      active:true,
-      start:row.start,
-      duration:row.duration,
-      remaining: remaining > 0 ? remaining : 0
-    });
-
-  });
-
-});
-
-// =========================
-// TELEGRAM HELPERS
+// TELEGRAM
 // =========================
 
 async function sendTelegramRaw(chatId, message){
@@ -230,7 +281,8 @@ async function sendTelegramRaw(chatId, message){
     NODE_ENV: process.env.NODE_ENV,
     ENV
   });
-console.log("[TELEGRAM][FINAL TAG]", `[${ENV}]`);
+  console.log("[TELEGRAM][FINAL TAG]", `[${ENV}]`);
+
   const TOKEN = process.env.TELEGRAM_TOKEN;
   if(!TOKEN) return;
 
@@ -238,44 +290,6 @@ console.log("[TELEGRAM][FINAL TAG]", `[${ENV}]`);
     method:"POST",
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ chat_id:chatId, text:message })
-  });
-}
-
-async function sendTelegramWithKeyboard(chatId, text, keyboard){
-
-  const TOKEN = process.env.TELEGRAM_TOKEN;
-
-  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      chat_id:chatId,
-      text,
-      reply_markup:{ inline_keyboard:keyboard }
-    })
-  });
-}
-
-async function sendMaintenanceEndChoices(){
-
-  const TOKEN = process.env.TELEGRAM_TOKEN;
-  const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-
-  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({
-      chat_id: CHAT_ID,
-      text: `[${ENV}] Maintenance terminée. Action ?`,
-      reply_markup:{
-        inline_keyboard:[
-          [
-            { text:"🔁 Relancer la maintenance", callback_data:"restart_"+ENV },
-            { text:"🌐 Réactiver le site", callback_data:"resume_"+ENV }
-          ]
-        ]
-      }
-    })
   });
 }
 
