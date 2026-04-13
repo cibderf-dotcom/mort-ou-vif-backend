@@ -94,7 +94,9 @@ Mode: ${s.mode || "chrono"}`;
 
         console.log("[TELEGRAM] sending score", msg);
 
-        sendTelegramRaw(CHAT_ID, msg);
+       sendTelegramRaw(CHAT_ID, msg).catch(e => {
+  console.error("[TELEGRAM] async error", e);
+});
 
       }catch(e){
         console.error("[TELEGRAM] error", e);
@@ -134,7 +136,7 @@ app.post('/api/raz', (req, res)=>{
       ["Doc Holliday", 92, 40, 0, "zen"],
       ["Calamity Jane", 88, 35, 0, "chrono"],
       ["Matt", 91, 52, 0, "zen"],
-      ["Lucky Luke", 85, 30, 0, "chrono"]
+      ["Vivi", 89, 22, 1, "chrono"]
     ];
 
     let inserted = 0;
