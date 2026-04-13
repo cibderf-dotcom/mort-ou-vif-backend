@@ -214,9 +214,10 @@ app.post('/api/raz', (req, res)=>{
     console.log("[RAZ] table cleared, deleted =", this.changes);
 
     const demo = [
-      ["Doc Holliday", 92, 40, 0, "zen", "Rapide comme l'éclair"],
-      ["Calamity Jane", 88, 35, 0, "chrono", "Toujours solide"],
-      ["Matt", 91, 52, 0, "zen", "Merci pour les tests"],
+      ["Doc Holliday", 92, 40, 2, "zen", "Rapide comme l'éclair"],
+      ["Calamity Jane", 88, 35, 2, "chrono", "Toujours solide"],
+      ["Matt", 91, 52, 3, "zen", "Merci pour les tests"],
+      ["Matt", 99, 117, 5, "zen", "Shériff de la ville"],
       ["Vivi", 89, 22, 1, "chrono", "Belle remontée"]
     ];
 
