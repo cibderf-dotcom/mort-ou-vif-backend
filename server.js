@@ -214,11 +214,11 @@ app.post('/api/raz', (req, res)=>{
     console.log("[RAZ] table cleared, deleted =", this.changes);
 
     const demo = [
-  ["Doc Holliday", 92, 40, 0, "zen", "Rapide comme l'éclair"],
-  ["Calamity Jane", 88, 35, 0, "chrono", "Toujours solide"],
-  ["Matt", 91, 52, 0, "zen", "Merci pour les tests"],
-  ["Vivi", 89, 22, 1, "chrono", "Belle remontée"]
-];
+      ["Doc Holliday", 92, 40, 0, "zen", "Rapide comme l'éclair"],
+      ["Calamity Jane", 88, 35, 0, "chrono", "Toujours solide"],
+      ["Matt", 91, 52, 0, "zen", "Merci pour les tests"],
+      ["Vivi", 89, 22, 1, "chrono", "Belle remontée"]
+    ];
 
     let inserted = 0;
 
@@ -233,8 +233,8 @@ app.post('/api/raz', (req, res)=>{
       ].join("|");
 
       db.run(
-        "INSERT INTO scores (pseudo, score, cartes, stars, mode, signature) VALUES (?,?,?,?,?,?)",
-        [...d, signature],
+        "INSERT INTO scores (pseudo, score, cartes, stars, mode, comment, signature) VALUES (?,?,?,?,?,?,?)",
+        [d[0], d[1], d[2], d[3], d[4], d[5], signature],
         function(err){
 
           if(err){
