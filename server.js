@@ -222,7 +222,12 @@ app.get('/api/maintenance-status', (req,res)=>{
 // =========================
 
 async function sendTelegramRaw(chatId, message){
-
+  console.log("[TELEGRAM][ENV RAW]", {
+    APP_ENV: process.env.APP_ENV,
+    NODE_ENV: process.env.NODE_ENV,
+    ENV
+  });
+  console.log("[TELEGRAM][FINAL TAG]", tag);
   const TOKEN = process.env.TELEGRAM_TOKEN;
   if(!TOKEN) return;
 
