@@ -14,7 +14,7 @@ const ENV = (process.env.APP_ENV || process.env.NODE_ENV || "UNKNOWN").toUpperCa
 const BACKEND_PROD = process.env.BACKEND_PROD;
 const BACKEND_PREPROD = process.env.BACKEND_PREPROD;
 
-const db = new sqlite3.Database(path.resolve(__dirname, 'db.sqlite'));
+const db = new sqlite3.Database('/var/data/db.sqlite');
 
 db.serialize(function () {
 
