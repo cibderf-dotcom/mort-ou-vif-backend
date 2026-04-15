@@ -2,7 +2,22 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
+const { Pool } = require('pg');
 
+const DB_TYPE = process.env.DB_TYPE || 'sqlite';
+
+let pgPool = null;
+
+if (DB_TYPE === 'postgres') {
+  pgPool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  console.log("[DB] PostgreSQL mode actif");
+} else {
+  console.log("[DB] SQLite mode actif");
+}
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -55,11 +70,32 @@ db.serialize(function () {
 // ROUTES SCORES
 // =========================
 
-app.get('/api/scores', (req,res)=>{
+app.get('/api/scores', async (req,res)=>{
+
+  if(DB_TYPE === 'postgres'){
+    try{
+      console.log("[PG] GET /api/scores");
+
+      const result = await pgPool.query(
+        "SELECT * FROM scores WHERE deleted = false ORDER BY score DESC LIMIT 50"
+      );
+
+      console.log("[PG] rows =", result.rows.length);
+
+      return res.json(result.rows);
+
+    }catch(e){
+      console.error("[PG] error", e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // SQLite fallback (inchangé)
   db.all("SELECT * FROM scores WHERE deleted = 0 ORDER BY score DESC LIMIT 50", [], (err, rows)=>{
     if(err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
+
 });
 
 app.post('/api/scores', (req,res)=>{
