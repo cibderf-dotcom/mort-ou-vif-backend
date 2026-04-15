@@ -9,10 +9,9 @@ const DB_TYPE = process.env.DB_TYPE || 'sqlite';
 let pgPool = null;
 
 if (DB_TYPE === 'postgres') {
-  pgPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
+pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
   console.log("[DB] PostgreSQL mode actif");
 } else {
