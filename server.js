@@ -97,7 +97,7 @@ app.get('/api/scores', async (req,res)=>{
 
 });
 
-app.post('/api/scores', (req,res)=>{
+app.post('/api/scores', async (req,res)=>{
 
   const s = req.body;
 
@@ -116,6 +116,66 @@ app.post('/api/scores', (req,res)=>{
     s.mode || "chrono"
   ].join("|");
 
+  // =========================
+  // POSTGRESQL
+  // =========================
+  if(DB_TYPE === 'postgres'){
+    try{
+
+      const existing = await pgPool.query(
+        "SELECT id, deleted FROM scores WHERE signature = $1",
+        [signature]
+      );
+
+      if(existing.rows.length > 0){
+        const row = existing.rows[0];
+
+        if(row.deleted){
+          console.log("[PG] restoring id=", row.id);
+
+          await pgPool.query(
+            "UPDATE scores SET deleted = false WHERE id = $1",
+            [row.id]
+          );
+
+          return res.json({ok:true, restored:true});
+
+        } else {
+          console.log("[PG] duplicate ignored id=", row.id);
+          return res.json({ok:true, duplicate:true});
+        }
+      }
+
+      const result = await pgPool.query(
+        `INSERT INTO scores 
+        (pseudo, score, cartes, stars, comment, date, mode, deleted, signature)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,false,$8)
+        RETURNING id`,
+        [
+          s.pseudo,
+          s.score,
+          s.cartes || 0,
+          s.stars || 0,
+          s.comment || '',
+          s.date || nowParis(),
+          s.mode || "chrono",
+          signature
+        ]
+      );
+
+      console.log("[PG] inserted id=", result.rows[0].id);
+
+      return res.json({ok:true, id: result.rows[0].id});
+
+    }catch(e){
+      console.error("[PG] insert error", e);
+      return res.status(500).json({error:e.message});
+    }
+  }
+
+  // =========================
+  // SQLITE (fallback inchangé)
+  // =========================
   db.get(
     "SELECT id, deleted FROM scores WHERE signature = ?",
     [signature],
@@ -128,9 +188,6 @@ app.post('/api/scores', (req,res)=>{
 
       if(row){
         if(row.deleted){
-
-          console.log("[POST SCORE] restoring id=", row.id);
-
           db.run(
             "UPDATE scores SET deleted = 0 WHERE id = ?",
             [row.id],
@@ -139,12 +196,9 @@ app.post('/api/scores', (req,res)=>{
               return res.json({ok:true, restored:true});
             }
           );
-
         } else {
-          console.log("[POST SCORE] duplicate ignored id=", row.id);
           return res.json({ok:true, duplicate:true});
         }
-
         return;
       }
 
@@ -155,38 +209,14 @@ app.post('/api/scores', (req,res)=>{
           s.score,
           s.cartes || 0,
           s.stars || 0,
-          s.date || nowParis(), // ✅ FIX
+          s.date || nowParis(),
           s.mode || "chrono",
           signature
         ],
         function(err){
           if(err){
-            console.error("[POST SCORE] insert error", err);
             return res.status(500).json({error:err.message});
           }
-
-          console.log("[POST SCORE] inserted id=", this.lastID);
-
-          try{
-            const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-
-            const msg =
-`Nouveau score [${ENV}]
-${new Date(s.date || Date.now()).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })} 
-${s.pseudo}
-Score: ${s.score}
-Cartes: ${s.cartes || 0}
-Étoiles: ${s.stars || 0}
-Mode: ${s.mode || "chrono"}`;
-
-            sendTelegramRaw(CHAT_ID, msg).catch(e=>{
-              console.error("[TELEGRAM] async error", e);
-            });
-
-          }catch(e){
-            console.error("[TELEGRAM] error", e);
-          }
-
           res.json({ok:true, id:this.lastID});
         }
       );
