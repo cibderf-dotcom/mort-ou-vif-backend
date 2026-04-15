@@ -9,9 +9,20 @@ const DB_TYPE = process.env.DB_TYPE || 'sqlite';
 let pgPool = null;
 
 if (DB_TYPE === 'postgres') {
-pgPool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
+
+  if(!process.env.DATABASE_URL){
+    console.error("[DB] DATABASE_URL manquant");
+    process.exit(1); // stop propre
+  }
+
+  pgPool = new Pool({
+    connectionString: process.env.DATABASE_URL
+  });
+
+  console.log("[DB] PostgreSQL mode actif");
+} else {
+  console.log("[DB] SQLite mode actif");
+}
 
   console.log("[DB] PostgreSQL mode actif");
 } else {
