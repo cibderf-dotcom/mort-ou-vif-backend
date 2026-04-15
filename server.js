@@ -24,10 +24,6 @@ if (DB_TYPE === 'postgres') {
   console.log("[DB] SQLite mode actif");
 }
 
-  console.log("[DB] PostgreSQL mode actif");
-} else {
-  console.log("[DB] SQLite mode actif");
-}
 const app = express();
 const PORT = process.env.PORT || 3000;
 
