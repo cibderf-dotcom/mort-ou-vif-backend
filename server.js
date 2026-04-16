@@ -374,6 +374,91 @@ async function sendTelegramRaw(chatId, message){
 }
 
 // =========================
+// BACKUP SQL (POSTGRES ONLY)
+// =========================
+
+app.get('/backup.sql', async (req, res) => {
+
+  if (DB_TYPE !== 'postgres') {
+    return res.status(400).send("Postgres only");
+  }
+
+  try {
+    console.log("[BACKUP] start");
+
+    const result = await pgPool.query("SELECT * FROM scores ORDER BY id");
+
+    let sql = "";
+
+    // STRUCTURE
+    sql += `DROP TABLE IF EXISTS scores;
+DROP TABLE IF EXISTS maintenance;
+
+CREATE TABLE IF NOT EXISTS maintenance (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  start INTEGER,
+  duration INTEGER,
+  lastPing INTEGER,
+  ended BOOLEAN DEFAULT true
+);
+
+INSERT INTO maintenance (id,start,duration,lastPing,ended)
+VALUES (1,NULL,NULL,NULL,true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS scores (
+  id SERIAL PRIMARY KEY,
+  pseudo TEXT,
+  score INTEGER,
+  cartes INTEGER DEFAULT 0,
+  stars INTEGER DEFAULT 0,
+  comment TEXT DEFAULT '',
+  date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  mode TEXT DEFAULT 'chrono',
+  deleted BOOLEAN DEFAULT false,
+  signature TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_signature ON scores(signature);
+`;
+
+    // DATA
+    for (const row of result.rows) {
+
+      const esc = (v) => {
+        if (v === null || v === undefined) return "NULL";
+        return `'${String(v).replace(/'/g, "''")}'`;
+      };
+
+      sql += `INSERT INTO scores (id,pseudo,score,cartes,stars,comment,date,mode,deleted,signature) VALUES(`
+        + `${row.id},`
+        + `${esc(row.pseudo)},`
+        + `${row.score},`
+        + `${row.cartes || 0},`
+        + `${row.stars || 0},`
+        + `${esc(row.comment || '')},`
+        + `${esc(row.date)},`
+        + `${esc(row.mode)},`
+        + `${row.deleted ? 'true' : 'false'},`
+        + `${esc(row.signature)}`
+        + `);\n`;
+    }
+
+    // SEQUENCE
+    sql += `\nSELECT setval('scores_id_seq', (SELECT MAX(id) FROM scores));\n`;
+
+    console.log("[BACKUP] generated lines =", result.rows.length);
+
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(sql);
+
+  } catch (e) {
+    console.error("[BACKUP] error", e);
+    res.status(500).send(e.message);
+  }
+});
+
+// =========================
 // SERVER
 // =========================
 
