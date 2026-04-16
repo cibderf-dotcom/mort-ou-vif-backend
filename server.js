@@ -364,7 +364,11 @@ async function sendTelegramRaw(chatId, message){
   console.log("[TELEGRAM][FINAL TAG]", `[${ENV}]`);
 
   const TOKEN = process.env.TELEGRAM_TOKEN;
-  if(!TOKEN) return;
+
+  if(!TOKEN){
+    console.error("[TELEGRAM] TOKEN missing");
+    return;
+  }
 
   await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
     method:"POST",
@@ -372,6 +376,32 @@ async function sendTelegramRaw(chatId, message){
     body: JSON.stringify({ chat_id:chatId, text:message })
   });
 }
+
+app.post("/api/bug", async (req, res) => {
+  const msg = req.body.message;
+
+  if (!msg || typeof msg !== "string") {
+    return res.status(400).json({ error: "invalid" });
+  }
+
+  try {
+    const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+    if (!CHAT_ID) {
+      console.error("[BUG] CHAT_ID missing");
+      return res.status(500).json({ error: "config" });
+    }
+
+    await sendTelegramRaw(CHAT_ID, msg);
+
+    res.json({ ok: true });
+
+  } catch (e) {
+    console.error("[BUG] send error", e);
+    res.status(500).json({ error: "send_failed" });
+  }
+});
+
 
 // =========================
 // BACKUP SQL (POSTGRES ONLY)
