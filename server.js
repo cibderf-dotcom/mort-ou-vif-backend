@@ -473,11 +473,6 @@ function generateComment(score, seed) {
 
 app.post('/admin/regenerate-comments', async (req, res) => {
 
-  // 🔒 sécurité : preprod uniquement
-  if (ENV !== 'PREPROD') {
-    return res.status(403).send("forbidden");
-  }
-
   try {
 
     if (DB_TYPE === 'postgres') {
