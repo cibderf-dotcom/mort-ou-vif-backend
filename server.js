@@ -352,6 +352,170 @@ app.post('/api/raz', (req, res)=>{
 });
 
 // =========================
+// ADMIN - REGENERATE COMMENTS
+// =========================
+
+function generateComment(score, seed) {
+  function hash(n) {
+    let h = 0;
+    const str = String(n);
+    for (let i = 0; i < str.length; i++) {
+      h = (h << 5) - h + str.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h);
+  }
+
+  const h = hash(seed);
+
+  if (score <= 50) {
+    const c = [
+      "Même en cliquant au hasard tu fais mieux.",
+      "Performance audacieuse… dans le mauvais sens.",
+      "On dirait un test de bug.",
+      "T’as tenté quelque chose. Mauvaise idée.",
+      "Le chaos, mais organisé.",
+      "Même le hasard te bat."
+    ];
+    return c[h % c.length];
+  }
+
+  if (score <= 75) {
+    const c = [
+      "Y avait un plan… abandonné en route.",
+      "Pas loin. Mais clairement pas dedans.",
+      "Encourageant, mais pas rassurant.",
+      "On sent l’effort. Vraiment.",
+      "C’est moyen… mais assumé.",
+      "Encore un cran à passer."
+    ];
+    return c[h % c.length];
+  }
+
+  if (score <= 90) {
+    const c = [
+      "Là ça devient solide.",
+      "Tu maîtrises le sujet.",
+      "Respectable, clairement.",
+      "On commence à parler performance.",
+      "Propre. Rien à redire.",
+      "Tu fais le job."
+    ];
+    return c[h % c.length];
+  }
+
+  if (score <= 95) {
+    const c = [
+      "Très solide. Presque inquiétant.",
+      "On frôle l’élite.",
+      "Propre, maîtrisé.",
+      "Ça commence à devenir sérieux.",
+      "Niveau élevé confirmé.",
+      "Tu fais clairement la différence."
+    ];
+    return c[h % c.length];
+  }
+
+  if (score <= 100) {
+    const c = [
+      "Là on parle d’excellence.",
+      "Quasi irréprochable.",
+      "Tu surclasses clairement.",
+      "C’est du haut niveau.",
+      "Très peu de marge d’erreur.",
+      "Performance chirurgicale.",
+      "On va vérifier les logs, par principe.",
+      "Statistiquement très douteux.",
+      "Le jeu commence à se poser des questions.",
+      "Même le hasard hésite."
+    ];
+    return c[h % c.length];
+  }
+
+  if (score <= 120) {
+    const c = [
+      "Très au-dessus du lot.",
+      "Performance dominante.",
+      "Tu écrases clairement.",
+      "Niveau élite confirmé.",
+      "Le jeu commence à ne plus suivre.",
+      "C’est propre. Trop propre."
+    ];
+    return c[h % c.length];
+  }
+
+  if (score <= 150) {
+    const c = [
+      "Là c’est indécent.",
+      "Domination totale.",
+      "Tu casses complètement l’équilibrage.",
+      "Statistiquement très improbable.",
+      "On va vérifier les logs, par principe.",
+      "Le jeu doute sérieusement."
+    ];
+    return c[h % c.length];
+  }
+
+  const c = [
+    "Score illégal dans 12 pays.",
+    "Même le jeu abandonne.",
+    "On ne peut plus expliquer ça.",
+    "Le serveur transpire fortement.",
+    "Y a clairement un problème… mais pas chez toi.",
+    "C’est violent. Gratuitement.",
+    "On arrête là ou tu continues ?",
+    "Même le hasard refuse d’intervenir.",
+    "Plus rien n’a de sens.",
+    "On dépasse le cadre du jeu."
+  ];
+  return c[h % c.length];
+}
+
+app.post('/admin/regenerate-comments', async (req, res) => {
+
+  // 🔒 sécurité : preprod uniquement
+  if (ENV !== 'PREPROD') {
+    return res.status(403).send("forbidden");
+  }
+
+  try {
+
+    if (DB_TYPE === 'postgres') {
+
+      const result = await pgPool.query(`
+        SELECT id, score, cartes
+        FROM scores
+        WHERE deleted = false
+      `);
+
+      console.log("[REGEN] total =", result.rows.length);
+
+      for (const s of result.rows) {
+
+        const seed = `${s.score}_${s.cartes || 0}_${s.id}`;
+
+        const comment = generateComment(s.score, seed);
+
+        await pgPool.query(`
+          UPDATE scores
+          SET comment = $1
+          WHERE id = $2
+        `, [comment, s.id]);
+
+      }
+
+      return res.json({ ok: true, updated: result.rows.length });
+    }
+
+    return res.status(400).send("postgres only");
+
+  } catch (e) {
+    console.error("[REGEN] error", e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// =========================
 // TELEGRAM
 // =========================
 
