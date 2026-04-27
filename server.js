@@ -27,7 +27,11 @@ if (DB_TYPE === 'postgres') {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET","POST","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type"]
+}));
 app.use(express.json());
 app.options('*', cors());
 
@@ -41,6 +45,16 @@ app.use((req, res, next) => {
   }
 
   next();
+});
+
+app.use((err, req, res, next) => {
+  console.error("[GLOBAL ERROR]", err);
+
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+
+  res.status(500).json({ error: err.message || "server_error" });
 });
 
 const ENV = (process.env.APP_ENV || process.env.NODE_ENV || "UNKNOWN").toUpperCase();
