@@ -296,9 +296,9 @@ app.post('/api/score/:id/restore', (req,res)=>{
 });
 
 app.get('/api/hof/count', (req,res)=>{
-  db.get("SELECT COUNT(DISTINCT pseudo) as count FROM scores WHERE COALESCE(deleted, false) = false", [], (err,row)=>{
+  db.all("SELECT COUNT(DISTINCT TRIM(LOWER(pseudo))) as count FROM scores WHERE COALESCE(deleted, false) = false", [], (err,rows)=>{
     if(err) return res.status(500).json({ error: err.message });
-    res.json({ count: row.count || 0 });
+    res.json({ count: rows[0].count || 0 });
   });
 });
 
