@@ -228,10 +228,15 @@ const modeLabel = MODE_LABELS[mode] || `❓ ${mode}`;
 const rankResult = await pgPool.query(
   `
   SELECT COUNT(*) + 1 AS rank
-  FROM scores
-  WHERE COALESCE(deleted, false) = false
-    AND mode = $1
-    AND id <> $5
+  FROM (
+    SELECT id, score, stars, cartes
+    FROM scores
+    WHERE COALESCE(deleted, false) = false
+      AND mode = $1
+    ORDER BY score DESC, stars DESC, cartes DESC
+    LIMIT 50
+  ) sub
+  WHERE id <> $5
     AND (
       score > $2 OR
       (score = $2 AND stars > $3) OR
@@ -239,14 +244,14 @@ const rankResult = await pgPool.query(
     )
   `,
   [
-    s.mode || "chrono",
+    mode,
     s.score,
     s.stars || 0,
     s.cartes || 0,
-    result.rows[0].id   // 🔥 clé
+    result.rows[0].id
   ]
 );
-
+      
 const rank = rankResult.rows[0]?.rank || "?";
 
 await sendTelegramRaw(
