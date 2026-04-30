@@ -296,10 +296,21 @@ app.post('/api/score/:id/restore', (req,res)=>{
 });
 
 app.get('/api/hof/count', (req,res)=>{
+
+  console.log("[HOF] DB_TYPE =", DB_TYPE);
+
+  db.all("SELECT pseudo FROM scores", [], (_, rows)=>{
+    console.log("[HOF] total rows =", rows ? rows.length : "null");
+  });
+
   db.all("SELECT COUNT(DISTINCT TRIM(LOWER(pseudo))) as count FROM scores WHERE COALESCE(deleted, false) = false", [], (err,rows)=>{
     if(err) return res.status(500).json({ error: err.message });
+
+    console.log("[HOF] count result =", rows ? rows[0].count : "null");
+
     res.json({ count: rows[0].count || 0 });
   });
+
 });
 
 // =========================
