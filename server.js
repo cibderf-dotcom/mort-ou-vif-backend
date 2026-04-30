@@ -198,7 +198,12 @@ app.post('/api/scores', async (req,res)=>{
       );
 
       console.log("[PG] inserted id=", result.rows[0].id);
-
+      
+      await sendTelegramRaw(
+  process.env.TELEGRAM_CHAT_ID,
+  `🎯 ${s.pseudo} - ${s.score} pts (${s.stars || 0}★)`
+);
+      
       return res.json({ok:true, id: result.rows[0].id});
 
     }catch(e){
