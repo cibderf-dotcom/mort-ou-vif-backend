@@ -135,7 +135,7 @@ app.get('/api/scores', async (req,res)=>{
 const query = `
   SELECT * FROM scores
   WHERE COALESCE(deleted, false) = false
-    AND mode = $1
+    AND mode = $5
   ORDER BY score DESC, stars DESC, cartes DESC
   LIMIT 50
 `;
