@@ -295,19 +295,23 @@ app.post('/api/score/:id/restore', (req,res)=>{
   });
 });
 
-app.get('/api/hof/count', (req,res)=>{
+app.get('/api/hof/count', async (req,res)=>{
 
-  console.log("[HOF] DB_TYPE =", DB_TYPE);
+  if(DB_TYPE === 'postgres'){
+    try{
+      const result = await pgPool.query(
+        "SELECT COUNT(DISTINCT TRIM(LOWER(pseudo))) as count FROM scores WHERE COALESCE(deleted, false) = false"
+      );
 
-  db.all("SELECT pseudo FROM scores", [], (_, rows)=>{
-    console.log("[HOF] total rows =", rows ? rows.length : "null");
-  });
+      return res.json({ count: result.rows[0].count || 0 });
+
+    }catch(e){
+      return res.status(500).json({ error: e.message });
+    }
+  }
 
   db.all("SELECT COUNT(DISTINCT TRIM(LOWER(pseudo))) as count FROM scores WHERE COALESCE(deleted, false) = false", [], (err,rows)=>{
     if(err) return res.status(500).json({ error: err.message });
-
-    console.log("[HOF] count result =", rows ? rows[0].count : "null");
-
     res.json({ count: rows[0].count || 0 });
   });
 
