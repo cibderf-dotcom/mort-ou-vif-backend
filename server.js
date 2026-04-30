@@ -249,8 +249,6 @@ const rankResult = await pgPool.query(
 
 const rank = rankResult.rows[0]?.rank || "?";
 
-const modeLabel = (s.mode || "chrono") === "zen" ? "🤠 Zen" : "⏱️ Chrono";
-
 await sendTelegramRaw(
   process.env.TELEGRAM_CHAT_ID,
   `🏆 Nouveau score !
