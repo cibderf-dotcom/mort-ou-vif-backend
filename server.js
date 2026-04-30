@@ -6,6 +6,29 @@ const { Pool } = require('pg');
 
 const DB_TYPE = process.env.DB_TYPE || 'sqlite';
 
+const MODE_LABELS = {
+  // Chrono
+  "chrono": "⏱️ Chrono",
+  "chrono_180": "⏱️ Chrono 3 min",
+  "chrono_300": "⏱️ Chrono 5 min",
+  "chrono_600": "⏱️ Chrono 10 min",
+  "hard": "🔥 Hard",
+
+  // Zen / libres
+  "zen": "🤠 Zen",
+  "free": "♾️ No Limit",
+  "zen+": "🧘 Zen+",
+
+  // Pot limit
+  "pot": "♠️ Pot Limit",
+
+  // Futurs modes
+  "face": "🤼 Face à face",
+  "category": "📂 1 Catégorie",
+  "team": "👥 Équipes",
+  "multi": "🌐 Multi-joueurs"
+};
+
 let pgPool = null;
 
 if (DB_TYPE === 'postgres') {
@@ -198,6 +221,9 @@ app.post('/api/scores', async (req,res)=>{
       );
 
       console.log("[PG] inserted id=", result.rows[0].id);
+
+      const mode = (s.mode || "chrono").toLowerCase();
+const modeLabel = MODE_LABELS[mode] || `❓ ${mode}`;
       
 const rankResult = await pgPool.query(
   `
