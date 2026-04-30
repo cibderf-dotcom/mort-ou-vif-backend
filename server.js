@@ -243,7 +243,6 @@ WHERE sub.id <> $5
   )
   `,
   [
-    mode,
     s.score,
     s.stars || 0,
     s.cartes || 0,
