@@ -222,7 +222,7 @@ app.post('/api/scores', async (req,res)=>{
 
       console.log("[PG] inserted id=", result.rows[0].id);
 
-      const mode = (s.mode || "chrono").toLowerCase();
+      const mode = String(s.mode || "").toLowerCase().trim() || "chrono";
 const modeLabel = MODE_LABELS[mode] || `❓ ${mode}`;
       
 const rankResult = await pgPool.query(
@@ -231,6 +231,7 @@ const rankResult = await pgPool.query(
   FROM scores
   WHERE COALESCE(deleted, false) = false
     AND mode = $1
+    AND id <> $5
     AND (
       score > $2 OR
       (score = $2 AND stars > $3) OR
@@ -241,7 +242,8 @@ const rankResult = await pgPool.query(
     s.mode || "chrono",
     s.score,
     s.stars || 0,
-    s.cartes || 0
+    s.cartes || 0,
+    result.rows[0].id   // 🔥 clé
   ]
 );
 
