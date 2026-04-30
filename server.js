@@ -133,7 +133,7 @@ app.get('/api/scores', async (req,res)=>{
       console.log("[PG] GET /api/scores");
 
       const result = await pgPool.query(
-        "SELECT * FROM scores WHERE COALESCE(deleted, false) = false ORDER BY score DESC LIMIT 50"
+        "SELECT * FROM scores WHERE COALESCE(deleted, false) = false ORDER BY score DESC, stars DESC, cartes DESC LIMIT 50"
       );
 
       console.log("[PG] rows =", result.rows.length);
