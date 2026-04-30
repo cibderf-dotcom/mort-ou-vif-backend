@@ -199,9 +199,41 @@ app.post('/api/scores', async (req,res)=>{
 
       console.log("[PG] inserted id=", result.rows[0].id);
       
-      await sendTelegramRaw(
+const rankResult = await pgPool.query(
+  `
+  SELECT COUNT(*) + 1 AS rank
+  FROM scores
+  WHERE COALESCE(deleted, false) = false
+    AND mode = $1
+    AND (
+      score > $2 OR
+      (score = $2 AND stars > $3) OR
+      (score = $2 AND stars = $3 AND cartes > $4)
+    )
+  `,
+  [
+    s.mode || "chrono",
+    s.score,
+    s.stars || 0,
+    s.cartes || 0
+  ]
+);
+
+const rank = rankResult.rows[0]?.rank || "?";
+
+const modeLabel = (s.mode || "chrono") === "zen" ? "🤠 Zen" : "⏱️ Chrono";
+
+await sendTelegramRaw(
   process.env.TELEGRAM_CHAT_ID,
-  `🎯 ${s.pseudo} - ${s.score} pts (${s.stars || 0}★)`
+  `🏆 Nouveau score !
+
+${s.pseudo} entre dans le classement ${modeLabel}
+
+🎯 Score : ${s.score}
+⭐ Étoiles : ${s.stars || 0}
+🃏 Cartes : ${s.cartes || 0}
+
+📊 Classement : #${rank}`
 );
       
       return res.json({ok:true, id: result.rows[0].id});
