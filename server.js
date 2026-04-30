@@ -228,14 +228,9 @@ const modeLabel = MODE_LABELS[mode] || `❓ ${mode}`;
 const rankResult = await pgPool.query(
   `
   SELECT COUNT(*) + 1 AS rank
-FROM (
-  SELECT id, score, stars, cartes
-  FROM scores
-  WHERE COALESCE(deleted, false) = false
-    AND mode = $5
-  ORDER BY score DESC, stars DESC, cartes DESC
-  LIMIT 50
-) sub
+FROM scores sub
+WHERE COALESCE(sub.deleted, false) = false
+  AND sub.mode = $5
 WHERE sub.id <> $4
   AND (
     sub.score > $1 OR
