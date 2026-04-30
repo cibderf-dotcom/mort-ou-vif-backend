@@ -235,11 +235,11 @@ const rankResult = await pgPool.query(
     ORDER BY score DESC, stars DESC, cartes DESC
     LIMIT 50
   ) sub
-WHERE sub.id <> $5
+WHERE sub.id <> $4
   AND (
-    sub.score > $2 OR
-    (sub.score = $2 AND sub.stars > $3) OR
-    (sub.score = $2 AND sub.stars = $3 AND sub.cartes > $4)
+    sub.score > $1 OR
+    (sub.score = $1 AND sub.stars > $2) OR
+    (sub.score = $1 AND sub.stars = $2 AND sub.cartes > $3)
   )
   `,
   [
