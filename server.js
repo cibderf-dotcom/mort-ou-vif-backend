@@ -628,7 +628,12 @@ async function sendTelegramRaw(chatId, message){
   console.log("[TELEGRAM][FINAL TAG]", `[${ENV}]`);
 
   const TOKEN = process.env.TELEGRAM_TOKEN;
+const CHAT_ID = chatId;
 
+if(!TOKEN || !CHAT_ID){
+  console.error("[TELEGRAM] missing config", { TOKEN: !!TOKEN, CHAT_ID: !!CHAT_ID });
+  return;
+}
   if(!TOKEN){
     console.error("[TELEGRAM] TOKEN missing");
     return;
