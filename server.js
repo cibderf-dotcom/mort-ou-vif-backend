@@ -146,7 +146,7 @@ const result = await pgPool.query(
   `
   SELECT * FROM scores
   WHERE COALESCE(deleted, false) = false
-    AND mode = $1
+    AND ($1 = '' OR mode = $1)
   ORDER BY score DESC, stars DESC, cartes DESC
   LIMIT 50
   `,
