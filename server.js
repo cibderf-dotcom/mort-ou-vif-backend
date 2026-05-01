@@ -140,14 +140,17 @@ const query = `
   LIMIT 50
 `;
 
-const result = await pgPool.query(
-  query,
- const mode = String(req.query.mode || "").toLowerCase().trim();
+const mode = String(req.query.mode || "").toLowerCase().trim();
 
 const result = await pgPool.query(
-  query,
+  `
+  SELECT * FROM scores
+  WHERE COALESCE(deleted, false) = false
+    AND mode = $1
+  ORDER BY score DESC, stars DESC, cartes DESC
+  LIMIT 50
+  `,
   [mode || "chrono"]
-);
 );
 
       console.log("[PG] rows =", result.rows.length);
