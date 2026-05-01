@@ -150,7 +150,7 @@ const result = await pgPool.query(
   ORDER BY score DESC, stars DESC, cartes DESC
   LIMIT 50
   `,
-  [mode || "chrono"]
+  [mode]
 );
 
       console.log("[PG] rows =", result.rows.length);
