@@ -142,7 +142,12 @@ const query = `
 
 const result = await pgPool.query(
   query,
-  [req.query.mode || "chrono"]
+ const mode = String(req.query.mode || "").toLowerCase().trim();
+
+const result = await pgPool.query(
+  query,
+  [mode || "chrono"]
+);
 );
 
       console.log("[PG] rows =", result.rows.length);
