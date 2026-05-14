@@ -92,6 +92,34 @@ function nowParis(){
   return new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Paris' }).replace(' ', 'T');
 }
 
+function normalizeClientDate(rawDate){
+
+  if(!rawDate || typeof rawDate !== "string"){
+    return nowParis();
+  }
+
+  // déjà ISO
+  if(/^\d{4}-\d{2}-\d{2}/.test(rawDate)){
+    return rawDate;
+  }
+
+  // ancien format DD.MM.YY
+  const m = rawDate.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+
+  if(m){
+
+    const dd = m[1];
+    const mm = m[2];
+    const yy = m[3];
+
+    return `20${yy}-${mm}-${dd} 00:00:00`;
+  }
+
+  console.warn("[DATE] invalid client date =", rawDate);
+
+  return nowParis();
+}
+
 const db = new sqlite3.Database('/var/data/db.sqlite');
 
 db.serialize(function () {
@@ -223,7 +251,7 @@ app.post('/api/scores', async (req,res)=>{
           s.cartes || 0,
           s.stars || 0,
           s.comment || '',
-          s.date || nowParis(),
+          normalizeClientDate(s.date),
           s.mode || "chrono",
           signature
         ]
@@ -315,7 +343,7 @@ ${s.pseudo} entre dans le classement ${modeLabel}
           s.score,
           s.cartes || 0,
           s.stars || 0,
-          s.date || nowParis(),
+          normalizeClientDate(s.date),
           s.mode || "chrono",
           signature
         ],
