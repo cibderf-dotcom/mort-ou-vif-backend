@@ -793,6 +793,52 @@ app.get('/api/bug/count', async (req, res) => {
 });
 
 // =========================
+// Reset du compteur de bugs
+// =========================
+app.post('/api/bug/reset', async (req, res) => {
+
+  if (DB_TYPE === 'postgres') {
+
+    try {
+
+      await pgPool.query(`
+        UPDATE bug_counter
+        SET count = 0
+        WHERE id = 1
+      `);
+
+      return res.json({ ok: true });
+
+    } catch (e) {
+
+      console.error("[BUG RESET][PG]", e);
+
+      return res.status(500).json({
+        error: e.message
+      });
+    }
+  }
+
+  db.run(`
+    UPDATE bug_counter
+    SET count = 0
+    WHERE id = 1
+  `, [], function(err) {
+
+    if (err) {
+
+      console.error("[BUG RESET][SQLITE]", err);
+
+      return res.status(500).json({
+        error: err.message
+      });
+    }
+
+    res.json({ ok: true });
+  });
+});
+
+// =========================
 // BACKUP SQL (POSTGRES ONLY)
 // =========================
 
