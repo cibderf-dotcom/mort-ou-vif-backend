@@ -139,6 +139,12 @@ db.serialize(function () {
 
   db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_signature ON scores(signature)`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS bug_counter (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  count INTEGER DEFAULT 0
+)`);
+
+db.run(`INSERT OR IGNORE INTO bug_counter (id, count) VALUES (1, 0)`);
   db.run(`CREATE TABLE IF NOT EXISTS maintenance (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     start INTEGER,
@@ -699,7 +705,22 @@ app.post("/api/bug", async (req, res) => {
     }
 
     await sendTelegramRaw(CHAT_ID, msg);
+if (DB_TYPE === 'postgres') {
 
+  await pgPool.query(`
+    UPDATE bug_counter
+    SET count = count + 1
+    WHERE id = 1
+  `);
+
+} else {
+
+  db.run(`
+    UPDATE bug_counter
+    SET count = count + 1
+    WHERE id = 1
+  `);
+}
     res.json({ ok: true });
 
   } catch (e) {
@@ -708,6 +729,68 @@ app.post("/api/bug", async (req, res) => {
   }
 });
 
+// ======================
+// Ajout Compteur de bugs
+// ======================
+app.get('/api/bug/count', async (req, res) => {
+
+  if (DB_TYPE === 'postgres') {
+
+    try {
+
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS bug_counter (
+          id INTEGER PRIMARY KEY,
+          count INTEGER DEFAULT 0
+        )
+      `);
+
+      await pgPool.query(`
+        INSERT INTO bug_counter (id, count)
+        VALUES (1, 0)
+        ON CONFLICT (id) DO NOTHING
+      `);
+
+      const result = await pgPool.query(`
+        SELECT count
+        FROM bug_counter
+        WHERE id = 1
+      `);
+
+      return res.json({
+        count: result.rows[0]?.count || 0
+      });
+
+    } catch (e) {
+
+      console.error("[BUG COUNT][PG]", e);
+
+      return res.status(500).json({
+        error: e.message
+      });
+    }
+  }
+
+  db.get(`
+    SELECT count
+    FROM bug_counter
+    WHERE id = 1
+  `, [], (err, row) => {
+
+    if (err) {
+
+      console.error("[BUG COUNT][SQLITE]", err);
+
+      return res.status(500).json({
+        error: err.message
+      });
+    }
+
+    res.json({
+      count: row?.count || 0
+    });
+  });
+});
 
 // =========================
 // BACKUP SQL (POSTGRES ONLY)
