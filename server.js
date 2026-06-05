@@ -704,24 +704,55 @@ app.post("/api/bug", async (req, res) => {
       return res.status(500).json({ error: "config" });
     }
 
-    await sendTelegramRaw(CHAT_ID, msg);
+let bugNumber;
 if (DB_TYPE === 'postgres') {
 
-  await pgPool.query(`
+  const result = await pgPool.query(`
     UPDATE bug_counter
     SET count = count + 1
     WHERE id = 1
+    RETURNING count
   `);
+
+  bugNumber = result.rows[0].count;
 
 } else {
 
-  db.run(`
-    UPDATE bug_counter
-    SET count = count + 1
-    WHERE id = 1
-  `);
+  await new Promise((resolve, reject) => {
+    db.run(`
+      UPDATE bug_counter
+      SET count = count + 1
+      WHERE id = 1
+    `, [], function(err){
+      if(err) return reject(err);
+      resolve();
+    });
+  });
+
+  const row = await new Promise((resolve, reject) => {
+    db.get(`
+      SELECT count
+      FROM bug_counter
+      WHERE id = 1
+    `, [], (err, row) => {
+      if(err) return reject(err);
+      resolve(row);
+    });
+  });
+
+  bugNumber = row.count;
 }
-    res.json({ ok: true });
+    
+
+    await sendTelegramRaw(
+  CHAT_ID,
+  `[BUG-REPORT_#${bugNumber}]\n${msg}`
+);
+
+res.json({
+  ok: true,
+  bugId: bugNumber
+});
 
   } catch (e) {
     console.error("[BUG] send error", e);
